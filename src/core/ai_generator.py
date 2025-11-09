@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Initialize logger
+# Module logger
 logger = logging.getLogger(__name__)
 
 
