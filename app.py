@@ -6,6 +6,7 @@ Main Streamlit Application
 import streamlit as st
 import os
 from datetime import datetime
+from typing import Optional
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -23,36 +24,269 @@ from src.utils import (
     validate_api_key, format_file_size, show_success_message, show_error_message,
     show_warning_message, show_info_message, display_metric_card,
     display_fit_score_card, display_skill_match_card, display_progress_bar,
-    generate_analysis_markdown, generate_analysis_pdf
+    generate_analysis_markdown, generate_analysis_pdf,
+    save_api_key, load_api_key_from_file, delete_api_key_file
 )
 from src.config import SUPPORTED_MODES, DEFAULT_ANALYSIS_MODE
 
-# Page configuration
+# Page configuration - MUST be first Streamlit command
 setup_page_config()
+
+# Apply custom CSS
 apply_custom_css()
+
+# Test that Streamlit is working
+st.write("")  # Empty write to ensure Streamlit is initialized
 
 # Initialize database
 create_database()
 
-# Load API key from environment
+# Load API key - check session state, saved file, then environment
 def get_api_key():
-    """Load API key from environment variables"""
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        return None, "No API key found in .env file"
-    elif not validate_api_key(api_key):
-        return None, "Invalid API key format in .env file"
+    """
+    Load API key with priority:
+    1. Session state (user-entered in current session)
+    2. Saved file (previously saved by user)
+    3. Environment variable
+    """
+    # Check session state first
+    if 'api_key' in st.session_state and st.session_state['api_key']:
+        api_key = st.session_state['api_key']
+        if validate_api_key(api_key):
+            return api_key, "API key loaded from session"
+    
+    # Check saved file
+    saved_key = load_api_key_from_file()
+    if saved_key:
+        # Store in session state for future use
+        st.session_state['api_key'] = saved_key
+        return saved_key, "API key loaded from saved file"
+    
+    # Check environment variable
+    env_key = os.getenv('GEMINI_API_KEY')
+    if env_key and validate_api_key(env_key):
+        # Store in session state
+        st.session_state['api_key'] = env_key
+        return env_key, "API key loaded from environment"
+    
+    return None, "No API key found. Please enter your Gemini API key in the sidebar."
+
+# Sidebar for API Key Management - MUST be early in the script
+# This sidebar appears on all pages and persists across navigation
+with st.sidebar:
+    # Header
+    st.markdown("""
+    <div style="margin-bottom: var(--space-5);">
+        <h2 style="font-size: 1.125rem; font-weight: 600; color: var(--gray-900); margin-bottom: var(--space-2);">
+            🔑 API Key Settings
+        </h2>
+        <p style="font-size: 0.8125rem; color: var(--gray-600); line-height: 1.5; margin: 0;">
+            Your key is stored locally and automatically loaded on startup.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize API key here (moved to sidebar for proper initialization)
+    api_key, api_status = get_api_key()
+    
+    # Show current API key status - cleaner design
+    if api_key:
+        # Initialize show key state
+        if 'show_api_key' not in st.session_state:
+            st.session_state['show_api_key'] = False
+        
+        # Display the API key based on show/hide state
+        if st.session_state['show_api_key']:
+            # Show FULL key when "Show Key" is pressed
+            display_key = api_key
+        else:
+            # Show completely masked version (only dots, no partial key)
+            display_key = "•" * min(30, len(api_key))
+        
+        # Clean status card
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+                    border: 1px solid var(--success); border-radius: var(--radius-lg); 
+                    padding: var(--space-4); margin-bottom: var(--space-5);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <span style="font-size: 1.125rem;">✅</span>
+                    <strong style="font-size: 0.875rem; color: var(--gray-800);">API Key Active</strong>
+                </div>
+            </div>
+            <div style="background: rgba(255,255,255,0.6); border-radius: var(--radius); 
+                        padding: var(--space-2) var(--space-3); margin-top: var(--space-2);">
+                <code style="font-size: 0.75rem; color: var(--gray-700); font-family: 'Courier New', monospace; word-break: break-all; user-select: all;">
+                    {display_key}
+                </code>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Show/Hide toggle button below status
+        if st.button("👁️ Show Key" if not st.session_state['show_api_key'] else "🙈 Hide Key", 
+                    key="toggle_show_key", help="Toggle API key visibility", use_container_width=True):
+            st.session_state['show_api_key'] = not st.session_state['show_api_key']
+            st.rerun()
     else:
-        return api_key, "API key loaded successfully"
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
+                    border: 1px solid var(--warning); border-radius: var(--radius-lg); 
+                    padding: var(--space-4); margin-bottom: var(--space-5);">
+            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                <span style="font-size: 1.125rem;">⚠️</span>
+                <strong style="font-size: 0.875rem; color: var(--gray-800);">No API key configured</strong>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Divider
+    st.markdown("<hr style='margin: var(--space-5) 0; border: none; border-top: 1px solid var(--gray-200);'>", unsafe_allow_html=True)
+    
+    # API Key Input Section - cleaner design
+    st.markdown("""
+    <div style="margin-bottom: var(--space-3);">
+        <label style="font-size: 0.875rem; font-weight: 600; color: var(--gray-800); display: block;">
+            Enter API Key
+        </label>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Text input for API key with integrated show/hide
+    if 'show_input_key' not in st.session_state:
+        st.session_state['show_input_key'] = False
+    
+    # Input field with better styling
+    new_api_key = st.text_input(
+        "API Key",
+        value="",
+        type="password" if not st.session_state['show_input_key'] else "default",
+        help="Enter your Google Gemini API key. Get one at https://makersuite.google.com/app/apikey",
+        label_visibility="collapsed",
+        key="api_key_input",
+        placeholder="AIzaSyC..."
+    )
+    
+    # Show/Hide toggle for input (below the field)
+    if st.button("👁️ Show" if not st.session_state['show_input_key'] else "🙈 Hide", 
+                key="toggle_input_key", help="Show/Hide while typing", use_container_width=True):
+        st.session_state['show_input_key'] = not st.session_state['show_input_key']
+        st.rerun()
+    
+    # Action buttons - wider layout for better text display
+    st.markdown("<div style='margin-top: var(--space-4);'></div>", unsafe_allow_html=True)
+    
+    # Save button (full width, primary)
+    if st.button("💾 Save Key", use_container_width=True, key="save_api_key_btn", type="primary"):
+        if new_api_key:
+            if validate_api_key(new_api_key):
+                if save_api_key(new_api_key):
+                    st.session_state['api_key'] = new_api_key
+                    st.session_state['api_key_saved'] = True
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("Failed to save API key. Please try again.")
+            else:
+                st.error("Invalid API key format. Must start with 'AIza' and be at least 20 characters.")
+        else:
+            st.warning("Please enter an API key first.")
+    
+    # Change and Remove buttons side by side
+    col_change, col_remove = st.columns(2, gap="small")
+    
+    with col_change:
+        if st.button("🔄 Change", use_container_width=True, key="change_api_key_btn"):
+            if api_key:
+                st.session_state['api_key_input'] = ""
+                st.info("Enter your new API key above and click Save.")
+            else:
+                st.info("Enter your API key above and click Save.")
+    
+    with col_remove:
+        if st.button("🗑️ Remove", use_container_width=True, key="remove_api_key_btn"):
+            if api_key:
+                if delete_api_key_file():
+                    if 'api_key' in st.session_state:
+                        del st.session_state['api_key']
+                    st.success("✅ API key removed!")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("Failed to remove API key.")
+            else:
+                st.info("No API key to remove.")
+    
+    # Success indicator (if key was just saved)
+    if 'api_key_saved' in st.session_state and st.session_state.get('api_key_saved'):
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+                    border: 1px solid var(--success); border-radius: var(--radius-lg); 
+                    padding: var(--space-3); margin-top: var(--space-4); text-align: center;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-2);">
+                <span style="font-size: 1rem;">✅</span>
+                <strong style="font-size: 0.875rem; color: var(--gray-800);">Key saved successfully!</strong>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        # Clear the flag after showing
+        st.session_state['api_key_saved'] = False
+    
+    # Info section
+    st.markdown("""
+    <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200);">
+        <p style="font-size: 0.75rem; color: var(--gray-500); line-height: 1.5;">
+            <strong>ℹ️ How to get your API key:</strong><br>
+            1. Visit <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: var(--primary);">Google AI Studio</a><br>
+            2. Sign in with your Google account<br>
+            3. Create a new API key<br>
+            4. Copy and paste it here
+        </p>
+        <p style="font-size: 0.75rem; color: var(--gray-500); margin-top: var(--space-3);">
+            🔒 Your API key is stored locally on your device and never shared. It persists across sessions.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-# Check API key status
-api_key, api_status = get_api_key()
+# Get API key from session state for use in main app (already initialized in sidebar)
+# Also check saved file and environment as fallback
+def get_user_api_key() -> Optional[str]:
+    """
+    Get the user's API key from session state, saved file, or environment.
+    This ensures the key is always available for API calls.
+    
+    Returns:
+        API key string or None if not found
+    """
+    # First check session state (user-entered in current session)
+    if 'api_key' in st.session_state and st.session_state.get('api_key'):
+        api_key = st.session_state['api_key']
+        if validate_api_key(api_key):
+            return api_key
+    
+    # Check saved file (persisted from previous sessions)
+    saved_key = load_api_key_from_file()
+    if saved_key:
+        st.session_state['api_key'] = saved_key
+        return saved_key
+    
+    # Last resort: check environment variable
+    env_key = os.getenv('GEMINI_API_KEY')
+    if env_key and validate_api_key(env_key):
+        st.session_state['api_key'] = env_key
+        return env_key
+    
+    return None
 
-# Main header
+# Get API key for use throughout the app
+# Note: This is refreshed on each rerun, so it always has the latest value from session_state
+api_key = get_user_api_key()
+
+# Main header - using st.title for better visibility
+st.title("📝 Cover Letter Generator")
 st.markdown("""
-<div style="text-align: center; margin-bottom: 3rem;">
-    <h1 class="main-header">Cover Letter Generator</h1>
-    <p style="color: var(--gray-600); font-size: 1.125rem; margin-top: 1rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+<div style="text-align: center; margin-bottom: 2rem;">
+    <p style="color: var(--gray-600); font-size: 1.125rem; margin-top: 0.5rem; max-width: 600px; margin-left: auto; margin-right: auto;">
         AI-powered cover letter generation tailored to your resume and job description
     </p>
 </div>
@@ -279,7 +513,7 @@ with tab1:
         elif not st.session_state.get('job_description'):
             show_error_message("Please enter a job description")
         elif not api_key:
-            show_error_message("Gemini API key not found. Please create a .env file with GEMINI_API_KEY=your_key")
+            show_error_message("Gemini API key not found. Please enter your API key in the sidebar.")
         else:
             # Generate cover letter
             with st.spinner("Generating your personalized cover letter..."):
@@ -333,7 +567,7 @@ with tab1:
         
         if st.button("🔄 Generate Variations", type="primary", use_container_width=True, key="generate_variations"):
             if not api_key:
-                show_error_message("Gemini API key required for A/B testing. Please add GEMINI_API_KEY to .env file.")
+                show_error_message("Gemini API key required for A/B testing. Please enter your API key in the sidebar.")
             else:
                 with st.spinner("Generating cover letter variations (this may take a minute)..."):
                     try:
@@ -439,7 +673,7 @@ with tab1:
         with col5:
             if st.button("Regenerate", use_container_width=True):
                 if not api_key:
-                    show_error_message("Gemini API key not found. Please create a .env file with GEMINI_API_KEY=your_key")
+                    show_error_message("Gemini API key not found. Please enter your API key in the sidebar.")
                 else:
                     with st.spinner("Regenerating cover letter..."):
                         cover_letter, success, error_msg = generate_cover_letter(
@@ -519,18 +753,45 @@ with tab2:
         opt_col_a, opt_col_b = st.columns([1,1])
         with opt_col_a:
             analysis_mode = st.selectbox("Analysis Mode", SUPPORTED_MODES, index=SUPPORTED_MODES.index(DEFAULT_ANALYSIS_MODE))
+        with opt_col_b:
+            # Clear cache button to force fresh analysis
+            if st.button("🔄 Clear Cache & Re-analyze", help="Clear cached results and run fresh analysis", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+        
         # Show API key status for analysis
         if not api_key:
-            show_warning_message("Analysis running in fallback mode (no AI features). Add GEMINI_API_KEY to .env for enhanced analysis.")
+            show_error_message("❌ **No API key found!** Please enter your Gemini API key in the sidebar (left side) to enable AI-powered analysis. Without it, the analysis cannot extract skills from your resume and job description, resulting in 0% match.")
+        elif not validate_api_key(api_key):
+            show_error_message("❌ **Invalid API key!** Please check your API key in the sidebar. It should start with 'AIza' and be at least 20 characters long.")
         
         # Perform analysis with simple spinner
         with st.spinner("Analyzing job fit..."):
-            fit_analysis = analyze_job_fit(
-                st.session_state['resume_text'],
-                st.session_state['job_description'],
-                api_key,
-                analysis_mode
-            )
+            try:
+                fit_analysis = analyze_job_fit(
+                    st.session_state['resume_text'],
+                    st.session_state['job_description'],
+                    api_key,
+                    analysis_mode
+                )
+                
+                # Check if API key was missing
+                if fit_analysis.get('api_key_missing'):
+                    show_error_message("❌ **Analysis failed: No API key provided.** Please enter your Gemini API key in the sidebar and try again. Click '🔄 Clear Cache & Re-analyze' after adding your key.")
+            except Exception as e:
+                show_error_message(f"❌ **Analysis failed:** {str(e)}. Please check your API key in the sidebar and try again.")
+                # Return empty analysis to prevent crash
+                fit_analysis = {
+                    'overall_score': 0.0,
+                    'fit_level': 'Poor',
+                    'detected_language': 'en',
+                    'category_scores': {'technical_skills': 0.0, 'soft_skills': 0.0, 'methodologies': 0.0, 'experience_education': 0.0},
+                    'matched_details': {'technical_skills': [], 'soft_skills': [], 'methodologies': [], 'experience_education': []},
+                    'missing_details': {'technical_skills': [], 'soft_skills': [], 'methodologies': [], 'experience_education': []},
+                    'job_requirements': {},
+                    'candidate_profile': {},
+                    'recommendations': {}
+                }
         
         # Show success message
         st.success("Analysis complete!")
@@ -1060,7 +1321,7 @@ with tab4:
         
         if st.button("🚀 Generate Interview Prep Guide", type="primary", use_container_width=True):
             if not api_key:
-                show_error_message("Gemini API key required. Please add GEMINI_API_KEY to .env file.")
+                show_error_message("Gemini API key required. Please enter your API key in the sidebar.")
             else:
                 with st.spinner("Generating interview preparation guide (this may take a minute)..."):
                     try:

@@ -92,10 +92,10 @@ MODERN_CSS = """
     background: transparent;
 }
 
-/* Hide Streamlit Branding */
+/* Hide Streamlit Branding - but keep header for sidebar toggle */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
+/* Keep header visible so sidebar toggle button is accessible */
 
 /* Typography */
 h1, h2, h3, h4, h5, h6 {
@@ -219,14 +219,16 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: var(--radius);
     font-family: 'Inter', sans-serif;
     font-weight: 600;
-    font-size: 0.95rem;
-    padding: var(--space-4) var(--space-8);
+    font-size: 0.875rem;
+    padding: var(--space-3) var(--space-6);
     transition: all var(--transition-base);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
     height: auto;
+    min-height: 2.5rem;
     letter-spacing: 0.01em;
     position: relative;
     overflow: hidden;
+    white-space: nowrap;
 }
 
 .stButton > button::before {

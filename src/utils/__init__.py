@@ -15,7 +15,8 @@ from .helpers import (
     show_success_message, show_error_message, show_warning_message,
     show_info_message, display_metric_card, display_fit_score_card,
     display_skill_match_card, display_progress_bar,
-    generate_analysis_markdown, generate_analysis_pdf
+    generate_analysis_markdown, generate_analysis_pdf,
+    save_api_key, load_api_key_from_file, delete_api_key_file
 )
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     'show_success_message', 'show_error_message', 'show_warning_message',
     'show_info_message', 'display_metric_card', 'display_fit_score_card',
     'display_skill_match_card', 'display_progress_bar',
-    'generate_analysis_markdown', 'generate_analysis_pdf'
+    'generate_analysis_markdown', 'generate_analysis_pdf',
+    'save_api_key', 'load_api_key_from_file', 'delete_api_key_file'
 ]
 

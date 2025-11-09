@@ -16,9 +16,10 @@ class InterviewPrepService:
     
     def __init__(self, api_key: Optional[str] = None):
         """Initialize interview preparation service"""
+        if not api_key:
+            raise ValueError("API key is required for interview preparation service")
         self.api_key = api_key
-        if api_key:
-            genai.configure(api_key=api_key)
+        genai.configure(api_key=api_key)
     
     def generate_preparation_guide(
         self,

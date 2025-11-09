@@ -18,27 +18,23 @@ def initialize_gemini(api_key: Optional[str] = None) -> bool:
     Initialize Gemini API with API key
     
     Args:
-        api_key: Gemini API key (if None, tries to get from environment)
+        api_key: Gemini API key (required - should be provided from user input)
         
     Returns:
         True if initialization successful, False otherwise
     """
     try:
-        if api_key is None:
-            api_key = os.getenv('GEMINI_API_KEY')
-        
+        # Require API key to be provided (no fallback to environment)
         if not api_key:
-            st.error("Gemini API key not found. Please set GEMINI_API_KEY environment variable or provide it in the app.")
+            logger.warning("No API key provided to initialize_gemini")
             return False
         
         genai.configure(api_key=api_key)
-        
-        # API initialized
-        
+        logger.info("Gemini API initialized successfully")
         return True
         
     except Exception as e:
-        st.error(f"Failed to initialize Gemini API: {str(e)}")
+        logger.error(f"Failed to initialize Gemini API: {str(e)}")
         return False
 
 

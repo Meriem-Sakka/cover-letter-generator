@@ -768,8 +768,67 @@ def analyze_job_fit(resume_text: str, job_text: str, api_key: Optional[str] = No
         Dictionary containing complete fit analysis
     """
     logger.info("Starting AI-driven job fit analysis")
+    logger.info(f"API key provided: {'Yes' if api_key and len(api_key) > 0 else 'No'}")
+    
+    if not api_key:
+        logger.warning("No API key provided - extraction will return empty results")
+        # Return a fallback result structure with warning
+        return {
+            'overall_score': 0.0,
+            'fit_level': 'Poor',
+            'fit_color': '#ef4444',
+            'detected_language': 'en',
+            'technical_fit': 0.0,
+            'soft_fit': 0.0,
+            'methodology_fit': 0.0,
+            'experience_fit': 0.0,
+            'category_scores': {
+                'technical_skills': 0.0,
+                'soft_skills': 0.0,
+                'methodologies': 0.0,
+                'experience_education': 0.0
+            },
+            'matched_details': {
+                'technical_skills': [],
+                'soft_skills': [],
+                'methodologies': [],
+                'experience_education': []
+            },
+            'missing_details': {
+                'technical_skills': [],
+                'soft_skills': [],
+                'methodologies': [],
+                'experience_education': []
+            },
+            'job_requirements': {
+                'technical_skills': [],
+                'soft_skills': [],
+                'methodologies': [],
+                'education': [],
+                'experience': []
+            },
+            'candidate_profile': {
+                'technical_skills': [],
+                'soft_skills': [],
+                'methodologies': [],
+                'education': [],
+                'experience': []
+            },
+            'detailed_results': {},
+            'recommendations': {},
+            'rate_limited': False,
+            'api_key_missing': True  # Flag to indicate API key issue
+        }
+    
     analyzer = JobFitAnalyzer(api_key)
     result = analyzer.analyze_job_fit(resume_text, job_text, api_key, mode)
     logger.info(f"Analysis completed. Overall score: {result['overall_score']}%")
+    
+    # Log extraction results for debugging
+    job_req = result.get('job_requirements', {})
+    candidate_prof = result.get('candidate_profile', {})
+    logger.info(f"Extracted {len(job_req.get('technical_skills', []))} job technical skills")
+    logger.info(f"Extracted {len(candidate_prof.get('technical_skills', []))} candidate technical skills")
+    
     return result
 

@@ -21,7 +21,7 @@ def setup_page_config():
         page_title="Cover Letter Generator",
         page_icon="📝",
         layout="wide",
-        initial_sidebar_state="collapsed"
+        initial_sidebar_state="expanded"
     )
 
 
@@ -526,6 +526,88 @@ def validate_api_key(api_key: str) -> bool:
         return True
     
     return False
+
+
+def get_api_key_file_path() -> str:
+    """
+    Get the path to the API key storage file
+    
+    Returns:
+        Path to the API key file
+    """
+    config_dir = os.path.join(os.getcwd(), 'data', 'config')
+    os.makedirs(config_dir, exist_ok=True)
+    return os.path.join(config_dir, 'api_key.txt')
+
+
+def save_api_key(api_key: str) -> bool:
+    """
+    Save API key to local file
+    
+    Args:
+        api_key: API key to save
+        
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    try:
+        if not validate_api_key(api_key):
+            return False
+        
+        file_path = get_api_key_file_path()
+        # Save with restricted permissions (owner read/write only)
+        with open(file_path, 'w') as f:
+            f.write(api_key.strip())
+        
+        # Set file permissions to be readable/writable only by owner (Unix-like systems)
+        try:
+            os.chmod(file_path, 0o600)
+        except (AttributeError, OSError):
+            # Windows doesn't support chmod the same way, skip
+            pass
+        
+        return True
+    except Exception as e:
+        st.error(f"Failed to save API key: {str(e)}")
+        return False
+
+
+def load_api_key_from_file() -> Optional[str]:
+    """
+    Load API key from local file
+    
+    Returns:
+        API key if found and valid, None otherwise
+    """
+    try:
+        file_path = get_api_key_file_path()
+        if not os.path.exists(file_path):
+            return None
+        
+        with open(file_path, 'r') as f:
+            api_key = f.read().strip()
+        
+        if validate_api_key(api_key):
+            return api_key
+        return None
+    except Exception:
+        return None
+
+
+def delete_api_key_file() -> bool:
+    """
+    Delete the saved API key file
+    
+    Returns:
+        True if deleted successfully, False otherwise
+    """
+    try:
+        file_path = get_api_key_file_path()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return True
+    except Exception:
+        return False
 
 
 def format_file_size(size_bytes: int) -> str:

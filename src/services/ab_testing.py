@@ -15,9 +15,10 @@ class ABTestingService:
     
     def __init__(self, api_key: Optional[str] = None):
         """Initialize A/B testing service"""
+        if not api_key:
+            raise ValueError("API key is required for A/B testing service")
         self.api_key = api_key
-        if api_key:
-            genai.configure(api_key=api_key)
+        genai.configure(api_key=api_key)
     
     def generate_variations(
         self,
