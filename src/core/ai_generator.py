@@ -7,10 +7,14 @@ import google.generativeai as genai
 import streamlit as st
 from typing import Optional, Tuple
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 def initialize_gemini(api_key: Optional[str] = None) -> bool:
